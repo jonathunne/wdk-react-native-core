@@ -1,4 +1,4 @@
-# @tetherto/wdk-rn-core
+# @tetherto/wdk-react-native-core
 
 Core functionality for React Native wallets - wallet management, balance fetching, and worklet operations.
 
@@ -7,8 +7,8 @@ Core functionality for React Native wallets - wallet management, balance fetchin
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/itsdeka/wdk-rn-core.git
-cd wdk-rn-core
+git clone https://github.com/tetherto/wdk-react-native-core.git
+cd wdk-react-native-core
 
 # Install dependencies and build
 npm install
@@ -20,7 +20,7 @@ npm run build
 From your app directory:
 
 ```bash
-npm install https://github.com/itsdeka/wdk-rn-core.git
+npm install https://github.com/tetherto/wdk-react-native-core.git
 ```
 
 Or add to your `package.json`:
@@ -28,8 +28,8 @@ Or add to your `package.json`:
 ```json
 {
   "dependencies": {
-    "@tetherto/wdk-rn-secure-storage": "github:itsdeka/wdk-rn-secure-storage",
-    "@tetherto/wdk-rn-core": "github:itsdeka/wdk-rn-core"
+    "@tetherto/wdk-react-native-secure-storage": "github:tetherto/wdk-react-native-secure-storage",
+    "@tetherto/wdk-react-native-core": "github:tetherto/wdk-react-native-core"
   }
 }
 ```
@@ -39,8 +39,8 @@ Then run `npm install`.
 ### Contributing
 
 Since you're installing from source, you can:
-1. Make changes to the code in `wdk-rn-core`
-2. Rebuild: `cd wdk-rn-core && npm run build`
+1. Make changes to the code in `wdk-react-native-core`
+2. Rebuild: `cd wdk-react-native-core && npm run build`
 3. The changes will be reflected in your app immediately (or after reinstalling)
 4. Submit a pull request with your improvements!
 
@@ -48,7 +48,7 @@ Since you're installing from source, you can:
 
 ```bash
 npm install react@">=18.0.0" react-native@">=0.70.0"
-npm install '@tetherto/wdk-rn-secure-storage'
+npm install '@tetherto/wdk-react-native-secure-storage'
 ```
 
 ## Usage
@@ -56,8 +56,8 @@ npm install '@tetherto/wdk-rn-secure-storage'
 ### Basic Wallet Usage
 
 ```typescript
-import { useWallet, useWorklet, useWalletSetup } from '@tetherto/wdk-rn-core';
-import { createSecureStorage } from '@tetherto/wdk-rn-secure-storage';
+import { useWallet, useWorklet, useWalletSetup } from '@tetherto/wdk-react-native-core';
+import { createSecureStorage } from '@tetherto/wdk-react-native-secure-storage';
 
 function WalletComponent() {
   const secureStorage = createSecureStorage();
@@ -106,8 +106,8 @@ function WalletComponent() {
 ### Provider with Automatic Balance Fetching
 
 ```typescript
-import { WdkAppProvider, useWdkApp } from '@tetherto/wdk-rn-core';
-import { createSecureStorage } from '@tetherto/wdk-rn-secure-storage';
+import { WdkAppProvider, useWdkApp } from '@tetherto/wdk-react-native-core';
+import { createSecureStorage } from '@tetherto/wdk-react-native-secure-storage';
 
 function App() {
   const secureStorage = createSecureStorage();
@@ -179,7 +179,7 @@ function WalletApp() {
 The `useWallet` hook provides `callAccountMethod` to call account methods like `getBalance`, `getTokenBalance`, `signMessage`, `signTransaction`, etc.
 
 ```typescript
-import { useWallet } from '@tetherto/wdk-rn-core';
+import { useWallet } from '@tetherto/wdk-react-native-core';
 
 function AccountOperations() {
   const { callAccountMethod, isInitialized } = useWallet();
@@ -397,7 +397,7 @@ import {
   isEthereumAddress,
   isValidAccountIndex,
   isValidNetworkName 
-} from '@tetherto/wdk-rn-core'
+} from '@tetherto/wdk-react-native-core'
 
 // Validate before use
 if (!isNetworkConfigs(configs)) {
@@ -413,7 +413,7 @@ import {
   validateTokenConfigs,
   validateAccountIndex,
   validateTokenAddress 
-} from '@tetherto/wdk-rn-core'
+} from '@tetherto/wdk-react-native-core'
 
 // Throws if invalid
 validateNetworkConfigs(networkConfigs)

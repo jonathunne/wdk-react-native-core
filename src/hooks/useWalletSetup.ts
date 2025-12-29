@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react'
 
 // Internal modules
-import type { SecureStorage } from '@tetherto/wdk-rn-secure-storage'
+import type { SecureStorage } from '@tetherto/wdk-react-native-secure-storage'
 
 // Local imports
 import { WalletSetupService } from '../services/walletSetupService'

@@ -1,6 +1,6 @@
 # Error Handling Guidelines
 
-This document outlines the standardized error handling patterns used across the wdk-rn-core module.
+This document outlines the standardized error handling patterns used across the wdk-react-native-core module.
 
 ## Principles
 

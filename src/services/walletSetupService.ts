@@ -1,5 +1,5 @@
-import type { SecureStorage } from '@tetherto/wdk-rn-secure-storage'
-import { createSecureStorage } from '@tetherto/wdk-rn-secure-storage'
+import type { SecureStorage } from '@tetherto/wdk-react-native-secure-storage'
+import { createSecureStorage } from '@tetherto/wdk-react-native-secure-storage'
 import type { NetworkConfigs } from '../types'
 import { getWorkletStore } from '../store/workletStore'
 import { WorkletLifecycleService } from './workletLifecycleService'

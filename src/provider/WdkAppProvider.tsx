@@ -13,7 +13,7 @@
  */
 
 import React, { createContext, useEffect, useMemo } from 'react'
-import type { SecureStorage } from '@tetherto/wdk-rn-secure-storage'
+import type { SecureStorage } from '@tetherto/wdk-react-native-secure-storage'
 import type { NetworkConfigs, TokenConfigs } from '../types'
 import { useWdkInitialization } from '../hooks/useWdkInitialization'
 import { useWdkBalanceSync } from '../hooks/useWdkBalanceSync'

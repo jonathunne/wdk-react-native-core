@@ -1,5 +1,5 @@
 /**
- * @tetherto/wdk-rn-core
+ * @tetherto/wdk-react-native-core
  * 
  * Core functionality for React Native wallets
  * Provides wallet management, balance fetching, and worklet operations

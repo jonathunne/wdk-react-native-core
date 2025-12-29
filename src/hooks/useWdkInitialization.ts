@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { SecureStorage } from '@tetherto/wdk-rn-secure-storage'
+import type { SecureStorage } from '@tetherto/wdk-react-native-secure-storage'
 import type { NetworkConfigs } from '../types'
 import { useWorklet } from './useWorklet'
 import { useWalletSetup } from './useWalletSetup'
