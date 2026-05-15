@@ -137,34 +137,33 @@ export class AddressService {
 
   /**
    * Get addresses for multiple accounts and networks.
-   * This is the new, robust method for fetching addresses in bulk.
    */
   static async getAddresses(
     accountIndices: number[],
     networks?: string[],
   ): Promise<AddressInfoResult[]> {
+    const workletStore = getWorkletStore().getState();
+    const currentWdkConfigs = workletStore.wdkConfigs;
+    const configNetworks = currentWdkConfigs
+      ? Object.values(currentWdkConfigs.networks).map((n) => n.blockchain)
+      : undefined;
+    const networksToLoad = networks || configNetworks;
+
+    if (!networksToLoad) {
+      log(
+        'AddressService.getAddresses called before wdkConfigs were ready and no specific networks were provided.',
+      );
+      return [];
+    }
+
     try {
       await requireInitialized();
 
-      const workletStore = getWorkletStore().getState();
       const walletStore = getWalletStore().getState();
-      const currentWdkConfigs = workletStore.wdkConfigs;
       const currentActiveWalletId = walletStore.activeWalletId;
 
-      const configNetworks = currentWdkConfigs
-        ? Object.values(currentWdkConfigs.networks).map((n) => n.blockchain)
-        : undefined;
-      const networksToLoad = networks || configNetworks;
-
-      if (!networksToLoad) {
-        log(
-          'AddressService.getAddresses called before wdkConfigs were ready and no specific networks were provided.',
-        );
-        return [];
-      }
-
-      const jobs = networksToLoad.flatMap((network) =>
-        accountIndices.map((accountIndex) => ({ network, accountIndex })),
+      const jobs = accountIndices.flatMap((accountIndex) =>
+        networksToLoad.map((network) => ({ network, accountIndex }))
       );
       
       if (!currentActiveWalletId) {
@@ -214,132 +213,10 @@ export class AddressService {
     } catch (err) {
       logError('Failed to load addresses:', err);
       const error = err instanceof Error ? err : new Error('An unknown error occurred during address loading');
-      const networksToLoad = networks || Object.values(getWorkletStore().getState().wdkConfigs?.networks || {}).map(n => n.blockchain);
-      const jobs = (networksToLoad || []).flatMap((network) =>
-        accountIndices.map((accountIndex) => ({ network, accountIndex })),
+      const jobs = accountIndices.flatMap((accountIndex) =>
+        networksToLoad.map((network) => ({ network, accountIndex }))
       );
       return jobs.map(job => ({ ...job, success: false, reason: error }));
     }
-  }
-
-  /**
-   * Load all addresses for specified account indices across all configured networks
-   * Loads addresses in parallel for efficiency
-   *
-   * @param accountIndices - Array of account indices (defaults to [0] if not provided)
-   * @param walletId - Optional wallet identifier (defaults to activeWalletId from store)
-   * @returns Record of network -> accountIndex -> address for successfully loaded addresses
-   */
-  static async loadAllAddresses(
-    accountIndices: number[] = [0],
-    walletId?: string,
-  ): Promise<Record<string, Record<number, string>>> {
-    // Validate account indices
-    if (!Array.isArray(accountIndices) || accountIndices.length === 0) {
-      throw new Error('accountIndices must be a non-empty array')
-    }
-    accountIndices.forEach((index) => validateAccountIndex(index))
-
-    const walletStore = getWalletStore()
-    const workletStore = getWorkletStore()
-
-    // Resolve walletId from parameter or store
-    const targetWalletId = resolveWalletId(walletId)
-
-    const wdkConfigs = workletStore.getState().wdkConfigs
-    if (!wdkConfigs) {
-      throw new Error(
-        'WDK configs are not available. Ensure the worklet is started with wdkConfigs.',
-      )
-    }
-
-    const networks = Object.values(wdkConfigs.networks).map(n => n.blockchain)
-    if (networks.length === 0) {
-      log('[AddressService] No networks configured, returning empty addresses')
-      return {}
-    }
-
-    // Check which addresses are already cached to set loading state appropriately
-    const walletState = walletStore.getState()
-    const uncachedAddresses: Array<{ network: string; accountIndex: number }> =
-      []
-
-    networks.forEach((network) => {
-      accountIndices.forEach((accountIndex) => {
-        // Only set loading for addresses that aren't cached
-        const cachedAddress =
-          walletState.addresses[targetWalletId]?.[network]?.[accountIndex]
-        if (!cachedAddress) {
-          uncachedAddresses.push({ network, accountIndex })
-        }
-      })
-    })
-
-    // Set loading state to true for uncached addresses before starting
-    if (uncachedAddresses.length > 0) {
-      walletStore.setState((prev) =>
-        produce(prev, (state) => {
-          state.walletLoading[targetWalletId] ??= {}
-          for (const { network, accountIndex } of uncachedAddresses) {
-            const loadingKey = `${network}-${accountIndex}`
-            state.walletLoading[targetWalletId][loadingKey] = true
-          }
-        }),
-      )
-    }
-
-    // Load addresses in parallel for all networks and account indices
-    // getAddress handles its own loading states, but we've pre-set them for better UI feedback
-    const addressPromises: Array<Promise<[string, number, string | null]>> = []
-
-    networks.forEach((network) => {
-      accountIndices.forEach((accountIndex) => {
-        addressPromises.push(
-          (async (): Promise<[string, number, string | null]> => {
-            try {
-              const address = await this.getAddress(
-                network,
-                accountIndex,
-                walletId,
-              )
-              return [network, accountIndex, address]
-            } catch (error) {
-              // Log error but continue loading other addresses
-              logError(
-                `[AddressService] Failed to load address for ${network}:${accountIndex}:`,
-                error,
-              )
-              return [network, accountIndex, null]
-            }
-          })(),
-        )
-      })
-    })
-
-    // Wait for all addresses to load (or fail)
-    const results = await Promise.all(addressPromises)
-
-    // Build result record with structure: { [network]: { [accountIndex]: address } }
-    const addresses: Record<string, Record<number, string>> = {}
-    results.forEach(([network, accountIndex, address]) => {
-      if (address !== null) {
-        if (!addresses[network]) {
-          addresses[network] = {}
-        }
-        addresses[network][accountIndex] = address
-      }
-    })
-
-    const totalRequested = networks.length * accountIndices.length
-    const totalLoaded = Object.values(addresses).reduce(
-      (sum, networkAddresses) => sum + Object.keys(networkAddresses).length,
-      0,
-    )
-    log(
-      `[AddressService] Loaded ${totalLoaded}/${totalRequested} addresses for account indices [${accountIndices.join(
-        ', ',
-      )}]`,
-    )
-    return addresses
   }
 }
