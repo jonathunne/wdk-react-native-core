@@ -48,6 +48,7 @@ export type { UseWalletManagerResult, WalletInfo } from './hooks/useWalletManage
 export {
   useBalance,
   useBalancesForWallet,
+  useBalancesForWallets,
   useRefreshBalance,
   balanceQueryKeys,
 } from './hooks/useBalance'
