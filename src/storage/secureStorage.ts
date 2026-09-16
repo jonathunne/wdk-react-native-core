@@ -268,15 +268,15 @@ async function getSecureValue(baseKey: BaseKey, identifier: string): Promise<str
  * on Android it checks the stored entry's presence without invoking the Keystore
  * decrypt cipher.
  */
-async function checkKeyExists(storageKey: string): Promise<boolean> {
+async function checkKeyExists(baseKey: BaseKey, storageKey: string): Promise<boolean> {
   try {
     return await withTimeout(
       Keychain.hasGenericPassword({ service: storageKey }),
       DEFAULT_TIMEOUT_MS,
-      `checkKeyExists(${storageKey})`
+      `checkKeyExists(${baseKey})`
     )
   } catch (error) {
-    wrapError(error, `check key existence (${storageKey})`, KeychainReadError)
+    wrapError(error, `check key existence (${baseKey})`, KeychainReadError)
   }
 }
 
@@ -287,8 +287,8 @@ async function checkKeyExists(storageKey: string): Promise<boolean> {
  */
 async function resetStorageKeys(entries: { name: string; storageKey: string }[]): Promise<string[]> {
   const results = await Promise.allSettled(
-    entries.map(({ storageKey }) =>
-      withTimeout(Keychain.resetGenericPassword({ service: storageKey }), DEFAULT_TIMEOUT_MS, `deleteWallet(${storageKey})`)
+    entries.map(({ name, storageKey }) =>
+      withTimeout(Keychain.resetGenericPassword({ service: storageKey }), DEFAULT_TIMEOUT_MS, `deleteWallet(${name})`)
     )
   )
 
@@ -347,7 +347,7 @@ const secureStorage: SecureStorage = {
     // Existence is defined by the presence of the encrypted seed - encryption key and
     // entropy are always created and deleted together with it (see deleteWallet below).
     const seedStorageKey = await deriveStorageKey(ENCRYPTED_SEED, identifier)
-    return checkKeyExists(seedStorageKey)
+    return checkKeyExists(ENCRYPTED_SEED, seedStorageKey)
   },
 
   async deleteWallet(identifier) {
