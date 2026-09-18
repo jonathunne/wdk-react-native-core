@@ -15,23 +15,25 @@
 /**
  * Tests for secureStorage
  *
- * Covers the react-native-keychain wrapper: per-identifier service key derivation,
- * the device-only accessible policy, timeout handling, validation, and error wrapping.
+ * Covers the react-native-keychain wrapper: service key derivation, the device-only
+ * accessible policy, timeout handling, validation, and error wrapping.
  *
- * The service-key derivation tests pin the exact JS-level contract (base key strings,
- * identifier normalization, `${baseKey}_${hash}` format) that must stay byte-for-byte
- * compatible with the retired @tetherto/wdk-react-native-secure-storage package - both
- * implementations call the same expo-crypto SHA-256 primitive on the same normalized
- * input, so matching that contract here is what keeps existing users' keychain entries
- * reachable after the switch.
+ * Service-key derivation must stay byte-for-byte compatible with the retired
+ * @tetherto/wdk-react-native-secure-storage package (same SHA-256 primitive, same
+ * normalization) - those tests pin known digests computed independently via coreutils'
+ * sha256sum, to prove that rather than just asserting self-consistency with the mock
+ * below.
  *
- * react-native-keychain is faked in-memory (a Map keyed by service, wrapped in jest.fn()
- * so call assertions still work) rather than stubbed per call. deleteWallet is two-phase
- * (seed deleted only after key/entropy succeed), so failure tests need to target a
- * specific service key regardless of call order - a real fake makes that direct
- * (`mockKeychainState.forcedFailures.add(serviceKey)`) instead of threading brittle
- * `mockResolvedValueOnce` chains through call order.
+ * expo-crypto's digestStringAsync is faked with Node's `crypto` module - a valid
+ * stand-in since SHA-256 is standardized (FIPS 180-4) and produces the same digest
+ * regardless of implementation.
+ *
+ * react-native-keychain is faked in-memory (a Map keyed by service) rather than
+ * stubbed per call, since deleteWallet's two-phase delete needs failures targetable by
+ * service key regardless of call order.
  */
+
+import { createHash } from 'crypto'
 
 import * as Keychain from 'react-native-keychain'
 import * as Crypto from 'expo-crypto'
@@ -45,13 +47,13 @@ import {
 } from '../../src/storage/secureStorage'
 
 /**
- * Stand-in for SHA-256 (via expo-crypto's digestStringAsync). Nothing here asserts on the
- * hash's shape or length, only that the same input always produces the same output - an
- * identity function already satisfies that. Named with a `mock` prefix so jest's
+ * Stand-in for SHA-256 (via expo-crypto's digestStringAsync), backed by Node's `crypto`
+ * as an equivalent implementation - see the file-level doc comment above for why that's
+ * a faithful stand-in rather than a shortcut. Named with a `mock` prefix so jest's
  * out-of-scope-variable check for jest.mock() factories (below) allows referencing it.
  */
 function mockFakeHash(data: string): string {
-  return data
+  return createHash('sha256').update(data).digest('hex')
 }
 
 /** Mirrors deriveStorageKey's own formula, for tests that need to know a service name ahead of time. */
@@ -165,6 +167,17 @@ describe('secureStorage', () => {
         computeStorageKey(ENCRYPTED_SEED_BASE, TEST_ID),
         computeStorageKey(ENCRYPTED_ENTROPY_BASE, TEST_ID),
       ])
+    })
+
+    it('produces a real SHA-256 digest, not just a value consistent with its own mock', async () => {
+      const KNOWN_DIGESTS: Record<string, string> = {
+        'user@example.com': 'b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514',
+      }
+
+      await storage.setEncryptionKey('key-value', TEST_ID)
+
+      const service = (Keychain.setGenericPassword as jest.Mock).mock.calls[0][2].service
+      expect(service).toBe(`${ENCRYPTION_KEY_BASE}_${KNOWN_DIGESTS[TEST_ID]}`)
     })
   })
 
