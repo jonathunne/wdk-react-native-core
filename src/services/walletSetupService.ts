@@ -22,7 +22,7 @@ import { memzero } from '../utils/memzero'
 
 /**
  * Wallet setup service
- * Handles creating new wallets and loading existing wallets with biometric authentication
+ * Handles creating new wallets and loading existing wallets
  */
 export class WalletSetupService {
 
@@ -141,11 +141,11 @@ export class WalletSetupService {
     const encryptionKey = await secureStorage.getEncryptionKey(walletId)
 
     if (!encryptionKey) {
-      throw new Error('Encryption key not found. Authentication may have failed or wallet does not exist.')
+      throw new Error('Encryption key not found. Wallet may not exist.')
     }
 
     if (!encryptedSeed) {
-      throw new Error('Encrypted seed not found. Authentication may have failed or wallet does not exist.')
+      throw new Error('Encrypted seed not found. Wallet may not exist.')
     }
 
     return {
@@ -274,7 +274,7 @@ export class WalletSetupService {
   }
 
   /**
-   * Get encryption key (checks cache first, then secureStorage with biometrics)
+   * Get encryption key from secureStorage
    */
   static async getEncryptionKey(walletId: string): Promise<string | null> {
     const secureStorage = this.getSecureStorage()
@@ -283,7 +283,7 @@ export class WalletSetupService {
   }
 
   /**
-   * Get encrypted seed (checks cache first, then secureStorage)
+   * Get encrypted seed from secureStorage
    */
   static async getEncryptedSeed(walletId: string): Promise<string | null> {
     const secureStorage = this.getSecureStorage()
@@ -291,7 +291,7 @@ export class WalletSetupService {
   }
 
   /**
-   * Get encrypted entropy (checks cache first, then secureStorage)
+   * Get encrypted entropy from secureStorage
    */
   static async getEncryptedEntropy(walletId: string): Promise<string | null> {
     const secureStorage = this.getSecureStorage()
