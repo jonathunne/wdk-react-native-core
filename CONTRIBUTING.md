@@ -1,12 +1,5 @@
 ## Development
 
-### Building
-
-```bash
-npm run build
-npm run build:strict  # Strict mode (fails on errors)
-```
-
 ### Testing
 
 ```bash
