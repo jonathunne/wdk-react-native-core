@@ -113,13 +113,13 @@ export interface UseWalletManagerResult {
    */
   getMnemonic: (walletId: string) => Promise<string | null>
 
-  /** Get encryption key from cache or secure storage. */
+  /** Get encryption key from secure storage. */
   getEncryptionKey: (walletId: string) => Promise<string | null>
 
-  /** Get encrypted seed from cache or secure storage. */
+  /** Get encrypted seed from secure storage. */
   getEncryptedSeed: (walletId: string) => Promise<string | null>
 
-  /** Get encrypted entropy from cache or secure storage. */
+  /** Get encrypted entropy from secure storage. */
   getEncryptedEntropy: (walletId: string) => Promise<string | null>
 
   /** Generate entropy and encrypt (for creating new wallets). */
@@ -464,7 +464,7 @@ export function useWalletManager(): UseWalletManagerResult {
   )
 
   /**
-   * Get encryption key from cache or secure storage.
+   * Get encryption key from secure storage.
    * The app is responsible for any biometric or other security check before
    * calling this - the library does not enforce one.
    *
@@ -484,7 +484,7 @@ export function useWalletManager(): UseWalletManagerResult {
   )
 
   /**
-   * Get encrypted seed from cache or secure storage (no biometrics required)
+   * Get encrypted seed from secure storage.
    *
    * @param walletId - Optional walletId override (defaults to hook's walletId)
    * @returns Promise resolving to encrypted seed or null if not found
@@ -502,7 +502,7 @@ export function useWalletManager(): UseWalletManagerResult {
   )
 
   /**
-   * Get encrypted entropy from cache or secure storage (no biometrics required)
+   * Get encrypted entropy from secure storage.
    *
    * @param walletId - Optional walletId override (defaults to hook's walletId)
    * @returns Promise resolving to encrypted entropy or null if not found

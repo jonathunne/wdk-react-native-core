@@ -39,6 +39,13 @@ No secret value - seed, encryption key, entropy, or mnemonic - is cached
 anywhere in this library. Each read goes to `secureStorage` or the worklet
 fresh; none of it is retained in memory between calls.
 
+### secureStorage is local-only
+
+`secureStorage` never syncs or backs up anything - every value it writes
+stays on the device that wrote it. Cross-device recovery, if an app wants
+it, is a separate, explicit concern layered on top of this library's public
+API, not something this library performs itself.
+
 ### Out of scope
 
 - What a consuming app does with a value once it's handed back through the

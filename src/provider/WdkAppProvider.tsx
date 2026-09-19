@@ -14,7 +14,7 @@
 
 import React, { createContext, useMemo, useRef, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createSecureStorage } from '@tetherto/wdk-react-native-secure-storage'
+import { createSecureStorage } from '../storage/secureStorage'
 
 import { useWalletOrchestrator } from '../hooks/internal/useWalletOrchestrator'
 import { useWorkletInitializer } from '../hooks/internal/useWorkletInitializer'

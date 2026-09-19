@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Buffer } from 'buffer'
-import type { SecureStorage } from '@tetherto/wdk-react-native-secure-storage'
+import type { SecureStorage } from '../storage/secureStorage'
 
 import { WorkletLifecycleService } from './workletLifecycleService'
 import { DEFAULT_MNEMONIC_WORD_COUNT } from '../utils/constants'
@@ -22,7 +22,7 @@ import { memzero } from '../utils/memzero'
 
 /**
  * Wallet setup service
- * Handles creating new wallets and loading existing wallets with biometric authentication
+ * Handles creating new wallets and loading existing wallets
  */
 export class WalletSetupService {
 
@@ -69,7 +69,7 @@ export class WalletSetupService {
    * zeroed here once secureStorage has it.
    */
   static async createNewWallet(
-    walletId?: string
+    walletId: string
   ): Promise<{
     encryptionKey: Buffer
     encryptedSeed: Buffer
@@ -107,7 +107,7 @@ export class WalletSetupService {
 
     try {
       // Only convert keys to string at the border with the secure storage
-      await secureStorage.setEncryptionKey(Buffer.from(result.encryptionKey).toString('base64'), walletId, { requireBiometrics: false })
+      await secureStorage.setEncryptionKey(Buffer.from(result.encryptionKey).toString('base64'), walletId)
       await secureStorage.setEncryptedSeed(Buffer.from(result.encryptedSeedBuffer).toString('base64'), walletId)
       await secureStorage.setEncryptedEntropy(Buffer.from(result.encryptedEntropyBuffer).toString('base64'), walletId)
     } catch (error) {
@@ -130,7 +130,7 @@ export class WalletSetupService {
   }
 
   static async loadExistingWallet(
-    walletId?: string
+    walletId: string
   ): Promise<{
     encryptionKey: Buffer
     encryptedSeed: Buffer
@@ -138,14 +138,14 @@ export class WalletSetupService {
     const secureStorage = this.getSecureStorage()
 
     const encryptedSeed = await secureStorage.getEncryptedSeed(walletId)
-    const encryptionKey = await secureStorage.getEncryptionKey(walletId, { requireBiometrics: false })
+    const encryptionKey = await secureStorage.getEncryptionKey(walletId)
 
     if (!encryptionKey) {
-      throw new Error('Encryption key not found. Authentication may have failed or wallet does not exist.')
+      throw new Error('Encryption key not found. Wallet may not exist.')
     }
 
     if (!encryptedSeed) {
-      throw new Error('Encrypted seed not found. Authentication may have failed or wallet does not exist.')
+      throw new Error('Encrypted seed not found. Wallet may not exist.')
     }
 
     return {
@@ -154,7 +154,7 @@ export class WalletSetupService {
     }
   }
 
-  static async hasWallet(walletId?: string): Promise<boolean> {
+  static async hasWallet(walletId: string): Promise<boolean> {
     const secureStorage = this.getSecureStorage()
     return await secureStorage.hasWallet(walletId)
   }
@@ -166,7 +166,7 @@ export class WalletSetupService {
    */
   static async initializeFromMnemonic(
     mnemonic: string,
-    walletId?: string
+    walletId: string
   ): Promise<{
     encryptionKey: Buffer
     encryptedSeed: Buffer
@@ -204,7 +204,7 @@ export class WalletSetupService {
     }
 
     try {
-      await secureStorage.setEncryptionKey(Buffer.from(result.encryptionKey).toString('base64'), walletId, { requireBiometrics: false })
+      await secureStorage.setEncryptionKey(Buffer.from(result.encryptionKey).toString('base64'), walletId)
       await secureStorage.setEncryptedSeed(Buffer.from(result.encryptedSeedBuffer).toString('base64'), walletId)
       await secureStorage.setEncryptedEntropy(Buffer.from(result.encryptedEntropyBuffer).toString('base64'), walletId)
     } catch (error) {
@@ -244,7 +244,7 @@ export class WalletSetupService {
   static async initializeWallet(
     options: {
       createNew?: boolean
-      walletId?: string
+      walletId: string
     }
   ): Promise<void> {
     let credentials: { encryptionKey: Buffer; encryptedSeed: Buffer }
@@ -266,7 +266,7 @@ export class WalletSetupService {
   /**
    * Delete wallet and clear all data
    */
-  static async deleteWallet(walletId?: string): Promise<void> {
+  static async deleteWallet(walletId: string): Promise<void> {
     const secureStorage = this.getSecureStorage()
     
     await secureStorage.deleteWallet(walletId)
@@ -274,25 +274,26 @@ export class WalletSetupService {
   }
 
   /**
-   * Get encryption key (checks cache first, then secureStorage with biometrics)
+   * Get encryption key from secureStorage
    */
-  static async getEncryptionKey(walletId?: string): Promise<string | null> {
+  static async getEncryptionKey(walletId: string): Promise<string | null> {
     const secureStorage = this.getSecureStorage()
 
-    return secureStorage.getEncryptionKey(walletId, { requireBiometrics: false })  }
+    return secureStorage.getEncryptionKey(walletId)
+  }
 
   /**
-   * Get encrypted seed (checks cache first, then secureStorage)
+   * Get encrypted seed from secureStorage
    */
-  static async getEncryptedSeed(walletId?: string): Promise<string | null> {
+  static async getEncryptedSeed(walletId: string): Promise<string | null> {
     const secureStorage = this.getSecureStorage()
     return secureStorage.getEncryptedSeed(walletId)
   }
 
   /**
-   * Get encrypted entropy (checks cache first, then secureStorage)
+   * Get encrypted entropy from secureStorage
    */
-  static async getEncryptedEntropy(walletId?: string): Promise<string | null> {
+  static async getEncryptedEntropy(walletId: string): Promise<string | null> {
     const secureStorage = this.getSecureStorage()
     return secureStorage.getEncryptedEntropy(walletId)
   }
@@ -300,7 +301,7 @@ export class WalletSetupService {
   /**
    * Get mnemonic phrase from wallet
    */
-  static async getMnemonic(walletId?: string): Promise<string | null> {
+  static async getMnemonic(walletId: string): Promise<string | null> {
     const encryptedEntropy = await this.getEncryptedEntropy(walletId)
     const encryptionKey = await this.getEncryptionKey(walletId)
 
