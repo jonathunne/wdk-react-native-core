@@ -348,24 +348,24 @@ describe('AccountService', () => {
       ).rejects.toThrow(/Method getBalance returned no result|expected string/i)
     })
 
-    it('should throw error if result is null', async () => {
+    it('should throw invalid balance format if getBalance result is null', async () => {
       mockHRPC.callMethod.mockResolvedValue({
         result: JSON.stringify(null),
       })
 
       await expect(
         AccountService.callAccountMethod('ethereum', 0, 'getBalance')
-      ).rejects.toThrow('Parsed result is null or undefined')
+      ).rejects.toThrow('Invalid balance format: null')
     })
 
-    it('should throw error if result is null', async () => {
+    it('should resolve to null when a non-balance method returns null (e.g. unconfirmed tx block height)', async () => {
       mockHRPC.callMethod.mockResolvedValue({
         result: JSON.stringify(null),
       })
 
       await expect(
-        AccountService.callAccountMethod('ethereum', 0, 'getBalance')
-      ).rejects.toThrow('Parsed result is null or undefined')
+        AccountService.callAccountMethod('bitcoin', 0, 'getAddress')
+      ).resolves.toBeNull()
     })
 
     it('should throw error if JSON parsing fails', async () => {
@@ -384,6 +384,28 @@ describe('AccountService', () => {
       await expect(
         AccountService.callAccountMethod('ethereum', 0, 'getBalance')
       ).rejects.toThrow()
+    })
+  })
+
+  describe('callProtocolMethod', () => {
+    it('should resolve to null when the method returns null', async () => {
+      mockHRPC.callMethod.mockResolvedValue({
+        result: JSON.stringify(null),
+      })
+
+      await expect(
+        AccountService.callProtocolMethod('bitcoin', 0, 'getTransactionBlockHeight', 'lending', 'aave', 'txid')
+      ).resolves.toBeNull()
+    })
+
+    it('should throw error if JSON parsing fails', async () => {
+      mockHRPC.callMethod.mockResolvedValue({
+        result: 'invalid json',
+      })
+
+      await expect(
+        AccountService.callProtocolMethod('bitcoin', 0, 'getTransactionBlockHeight', 'lending', 'aave', 'txid')
+      ).rejects.toThrow('Failed to parse result from getTransactionBlockHeight')
     })
   })
 })
