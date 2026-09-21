@@ -13,53 +13,22 @@
 // limitations under the License.
 
 import { Buffer } from 'buffer'
-import type { SecureStorage } from '../storage/secureStorage'
+import { createSecureStorage } from '../storage/secureStorage'
 
 import { WorkletLifecycleService } from './workletLifecycleService'
 import { DEFAULT_MNEMONIC_WORD_COUNT } from '../utils/constants'
-import { log, logError } from '../utils/logger'
+import { logError } from '../utils/logger'
 import { memzero } from '../utils/memzero'
 
 /**
  * Wallet setup service
  * Handles creating new wallets and loading existing wallets
+ *
+ * createSecureStorage() always returns the same config-free singleton (see
+ * storage/secureStorage.ts), so there's nothing to inject or cache here - every method
+ * just asks for it directly.
  */
 export class WalletSetupService {
-
-  /**
-   * SecureStorage singleton instance
-   * Set by WdkAppProvider during initialization
-   */
-  private static secureStorageInstance: SecureStorage | null = null
-
-  /**
-   * Set the secureStorage singleton instance
-   * Called by WdkAppProvider during initialization
-   */
-  static setSecureStorage(secureStorage: SecureStorage, allowOverwrite: boolean = true): void {
-    if (this.secureStorageInstance && !allowOverwrite) {
-      log('SecureStorage already set - multiple WdkAppProviders may be mounted')
-    }
-    this.secureStorageInstance = secureStorage
-  }
-
-  /**
-   * Get the secureStorage singleton instance
-   * Throws error if not initialized
-   */
-  private static getSecureStorage(): SecureStorage {
-    if (!this.secureStorageInstance) {
-      throw new Error('SecureStorage not initialized. Ensure WdkAppProvider is mounted.')
-    }
-    return this.secureStorageInstance
-  }
-
-  /**
-   * Check if secureStorage is initialized
-   */
-  static isSecureStorageInitialized(): boolean {
-    return this.secureStorageInstance !== null
-  }
 
   /**
    * Create a new wallet, generating a fresh mnemonic
@@ -76,7 +45,7 @@ export class WalletSetupService {
   }> {
     await WorkletLifecycleService.ensureWorkletStarted()
 
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
 
     const result = await WorkletLifecycleService.generateEntropyAndEncrypt(DEFAULT_MNEMONIC_WORD_COUNT)
 
@@ -135,7 +104,7 @@ export class WalletSetupService {
     encryptionKey: Buffer
     encryptedSeed: Buffer
   }> {
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
 
     const encryptedSeed = await secureStorage.getEncryptedSeed(walletId)
     const encryptionKey = await secureStorage.getEncryptionKey(walletId)
@@ -155,7 +124,7 @@ export class WalletSetupService {
   }
 
   static async hasWallet(walletId: string): Promise<boolean> {
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
     return await secureStorage.hasWallet(walletId)
   }
 
@@ -174,7 +143,7 @@ export class WalletSetupService {
   }> {
     await WorkletLifecycleService.ensureWorkletStarted()
 
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
 
     const result = await WorkletLifecycleService.getSeedAndEntropyFromMnemonic(mnemonic)
 
@@ -267,7 +236,7 @@ export class WalletSetupService {
    * Delete wallet and clear all data
    */
   static async deleteWallet(walletId: string): Promise<void> {
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
     
     await secureStorage.deleteWallet(walletId)
     WorkletLifecycleService.reset()
@@ -277,7 +246,7 @@ export class WalletSetupService {
    * Get encryption key from secureStorage
    */
   static async getEncryptionKey(walletId: string): Promise<string | null> {
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
 
     return secureStorage.getEncryptionKey(walletId)
   }
@@ -286,7 +255,7 @@ export class WalletSetupService {
    * Get encrypted seed from secureStorage
    */
   static async getEncryptedSeed(walletId: string): Promise<string | null> {
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
     return secureStorage.getEncryptedSeed(walletId)
   }
 
@@ -294,7 +263,7 @@ export class WalletSetupService {
    * Get encrypted entropy from secureStorage
    */
   static async getEncryptedEntropy(walletId: string): Promise<string | null> {
-    const secureStorage = this.getSecureStorage()
+    const secureStorage = createSecureStorage()
     return secureStorage.getEncryptedEntropy(walletId)
   }
 

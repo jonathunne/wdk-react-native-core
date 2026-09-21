@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { createContext, useMemo, useRef, useEffect } from 'react'
+import React, { createContext, useMemo, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createSecureStorage } from '../storage/secureStorage'
 
 import { useWalletOrchestrator } from '../hooks/internal/useWalletOrchestrator'
 import { useWorkletInitializer } from '../hooks/internal/useWorkletInitializer'
 
-import { WalletSetupService } from '../services/walletSetupService'
 import { normalizeError } from '../utils/errorUtils'
 import { logError } from '../utils/logger'
 import { validateWdkConfigs } from '../utils/validation'
@@ -88,15 +86,6 @@ export function WdkAppProvider<
   wdkConfigs,
   children,
 }: WdkAppProviderProps<TNetwork, TProtocol>) {
-  // Synchronous service setup (must run before child effects)
-  const secureStorageInitialized = useRef<boolean | undefined>(undefined)
-  const secureStorage = useMemo(() => createSecureStorage(), [])
-
-  if (secureStorageInitialized.current == null) {
-    WalletSetupService.setSecureStorage(secureStorage)
-    secureStorageInitialized.current = true
-  }
-
   useEffect(() => {
     try {
       validateWdkConfigs(wdkConfigs)
