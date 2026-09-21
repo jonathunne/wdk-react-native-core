@@ -40,6 +40,7 @@ import * as Crypto from 'expo-crypto'
 
 import {
   createSecureStorage,
+  DEFAULT_IDENTIFIER,
   KeychainWriteError,
   KeychainReadError,
   ValidationError,
@@ -178,6 +179,44 @@ describe('secureStorage', () => {
 
       const service = (Keychain.setGenericPassword as jest.Mock).mock.calls[0][2].service
       expect(service).toBe(`${ENCRYPTION_KEY_BASE}_${KNOWN_DIGESTS[TEST_ID]}`)
+    })
+  })
+
+  describe('DEFAULT_IDENTIFIER (legacy no-identifier compat)', () => {
+    // Guard tests: the retired @tetherto/wdk-react-native-secure-storage package treated
+    // identifier as optional and, when omitted, stored under the bare base key (no hash,
+    // no suffix). identifier is now mandatory, so DEFAULT_IDENTIFIER exists purely to let
+    // callers reach that same legacy slot. If any of these break, existing users who never
+    // had a per-user identifier silently lose access to their already-stored wallet.
+
+    it('resolves to the bare base key, bypassing the hash', async () => {
+      await storage.setEncryptionKey('key-value', DEFAULT_IDENTIFIER)
+
+      expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
+        ENCRYPTION_KEY_BASE,
+        'key-value',
+        expect.objectContaining({ service: ENCRYPTION_KEY_BASE })
+      )
+    })
+
+    it('round-trips set/get/has/delete through the same legacy slot', async () => {
+      await storage.setEncryptedSeed('seed-value', DEFAULT_IDENTIFIER)
+
+      await expect(storage.getEncryptedSeed(DEFAULT_IDENTIFIER)).resolves.toBe('seed-value')
+      await expect(storage.hasWallet(DEFAULT_IDENTIFIER)).resolves.toBe(true)
+
+      await storage.deleteWallet(DEFAULT_IDENTIFIER)
+
+      await expect(storage.getEncryptedSeed(DEFAULT_IDENTIFIER)).resolves.toBeNull()
+      await expect(storage.hasWallet(DEFAULT_IDENTIFIER)).resolves.toBe(false)
+    })
+
+    it('does not collide with a real identifier stored alongside it', async () => {
+      await storage.setEncryptedSeed('default-seed', DEFAULT_IDENTIFIER)
+      await storage.setEncryptedSeed('real-user-seed', TEST_ID)
+
+      await expect(storage.getEncryptedSeed(DEFAULT_IDENTIFIER)).resolves.toBe('default-seed')
+      await expect(storage.getEncryptedSeed(TEST_ID)).resolves.toBe('real-user-seed')
     })
   })
 
