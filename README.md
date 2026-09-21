@@ -230,6 +230,15 @@ See [Architecture](docs/architecture.md) for details on the internal design.
 
 See [Security](docs/security.md) for details on security features and best practices.
 
+## Legacy Secure Storage Compatibility
+
+Affects versions after `v1.0.0-beta.20` (the last release before secure storage was
+inlined into this package) - `v1.0.0-beta.20` and earlier never had this concern.
+If `DEFAULT_IDENTIFIER` isn't exported from your installed version, this doesn't apply
+to you yet.
+
+See [Legacy Secure Storage Compatibility](docs/legacy-secure-storage-compat.md) if you're migrating off `@tetherto/wdk-react-native-secure-storage` and have existing users with wallets stored without a per-user identifier.
+
 ## Troubleshooting
 
 See [Troubleshooting](docs/troubleshooting.md) for common issues and solutions.

@@ -87,6 +87,15 @@ const ENCRYPTION_KEY: BaseKey = 'wallet_encryption_key'
 const ENCRYPTED_SEED: BaseKey = 'wallet_encrypted_seed'
 const ENCRYPTED_ENTROPY: BaseKey = 'wallet_encrypted_entropy'
 
+/**
+ * Sentinel identifier for callers migrating off a predecessor storage module that treated
+ * the identifier as optional and, when omitted, used the bare base key as the keychain
+ * service name (no hash, no suffix). `identifier` here is mandatory - passing this sentinel
+ * reproduces that exact lookup instead. Reserved: never assign this as a real per-user
+ * identifier, or that user's wallet collides with the legacy no-identifier slot.
+ */
+export const DEFAULT_IDENTIFIER = '__default__'
+
 function validateIdentifier(identifier: string): void {
   if (identifier === undefined || identifier === null) {
     throw new ValidationError('Identifier is required')
@@ -126,6 +135,8 @@ function validateValue(value: string, fieldName: string): void {
 /**
  * Derive the keychain `service` name for a base key + wallet identifier: SHA-256
  * (via expo-crypto) of the lowercased, trimmed identifier, formatted as `${baseKey}_${hash}`.
+ * `DEFAULT_IDENTIFIER` is the one exception - it bypasses hashing and resolves to the bare
+ * `baseKey`, see that constant's doc comment.
  *
  * This is how existing users' keychain entries get looked up - the scheme MUST stay
  * backward compatible. Changing the hash algorithm, the normalization, or the format
@@ -133,6 +144,9 @@ function validateValue(value: string, fieldName: string): void {
  */
 async function deriveStorageKey(baseKey: BaseKey, identifier: string): Promise<string> {
   validateIdentifier(identifier)
+  if (identifier === DEFAULT_IDENTIFIER) {
+    return baseKey
+  }
   const normalized = identifier.toLowerCase().trim()
   const hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, normalized)
   return `${baseKey}_${hash}`
@@ -189,8 +203,9 @@ function wrapError<T extends SecureStorageError>(
  * Secure storage interface for wallet credentials.
  *
  * Every method takes the wallet identifier explicitly - it's what namespaces entries
- * for multiple wallets on the same device. Getters return null when the value isn't
- * found; every method throws a SecureStorageError subclass on failure.
+ * for multiple wallets on the same device. Pass `DEFAULT_IDENTIFIER` to look up the
+ * legacy no-identifier slot instead of a real per-user identifier. Getters return null
+ * when the value isn't found; every method throws a SecureStorageError subclass on failure.
  */
 export interface SecureStorage {
   setEncryptionKey(key: string, identifier: string): Promise<void>
