@@ -26,6 +26,10 @@ import type { WdkConfigs } from '../../src/types'
 
 const TEST_ID = 'user@example.com'
 
+// WalletSetupService now calls createSecureStorage() itself rather than taking an
+// injected instance, so secureStorage.ts is mocked the same way as any other dependency.
+jest.mock('../../src/storage/secureStorage', () => require('../__mocks__/secureStorage'))
+
 // Mock WorkletLifecycleService
 jest.mock('../../src/services/workletLifecycleService', () => ({
   WorkletLifecycleService: {
@@ -76,8 +80,6 @@ describe('WalletSetupService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    // Set the secureStorage instance for testing
-    WalletSetupService.setSecureStorage(mockSecureStorage, true)
     resetMockSecureStorage()
     // Reset worklet store mock - default state
     const mockStore = getWorkletStore() as any
