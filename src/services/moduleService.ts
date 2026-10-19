@@ -19,6 +19,7 @@
  */
 
 import { handleServiceError } from '../utils/errorHandling'
+import { logWarn } from '../utils/logger'
 import { requireInitialized } from '../utils/storeHelpers'
 import { safeStringify } from '../utils/jsonUtils'
 import { validateModuleName } from '../utils/validation'
@@ -51,6 +52,9 @@ export function attachModuleEventDispatcher (rpcInstance: object): void {
   rpc.onModuleEvent(({ module, event, payload }) => {
     const set = listeners.get(listenerKey(module, event))
     if (set === undefined || set.size === 0) {
+      if (event === 'error') {
+        logWarn(`No listener for ${module} module error event:`, payload)
+      }
       return
     }
     let parsed: unknown = null

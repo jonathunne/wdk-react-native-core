@@ -18,10 +18,17 @@
  */
 
 import { attachModuleEventDispatcher, ModuleService } from '../../src/services/moduleService'
+import { logWarn } from '../../src/utils/logger'
 import { requireInitialized } from '../../src/utils/storeHelpers'
 
 jest.mock('../../src/utils/storeHelpers', () => ({
   requireInitialized: jest.fn(),
+}))
+
+jest.mock('../../src/utils/logger', () => ({
+  log: jest.fn(),
+  logError: jest.fn(),
+  logWarn: jest.fn(),
 }))
 
 const flushMicrotasks = async (): Promise<void> => { await new Promise((r) => setTimeout(r, 0)) }
@@ -77,6 +84,17 @@ describe('ModuleService', () => {
       attachModuleEventDispatcher(mockHRPC)
 
       expect(mockHRPC.onModuleEvent).toHaveBeenCalledTimes(1)
+    })
+
+    it('warns when a module error event arrives with no subscriber', () => {
+      let dispatch: ((evt: { module: string, event: string, payload?: string | null }) => void) | undefined
+      mockHRPC.onModuleEvent.mockImplementation((cb: typeof dispatch) => { dispatch = cb })
+      const payload = JSON.stringify({ message: 'invalid argument' })
+
+      attachModuleEventDispatcher(mockHRPC)
+      dispatch!({ module: 'addressBook', event: 'error', payload })
+
+      expect(logWarn).toHaveBeenCalledWith('No listener for addressBook module error event:', payload)
     })
 
     it('fans out worklet events to subscribers and stops after unsubscribe', async () => {
