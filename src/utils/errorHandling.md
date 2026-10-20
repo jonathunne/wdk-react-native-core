@@ -147,8 +147,8 @@ async function operation(signal?: AbortSignal): Promise<void> {
 - Clean up resources on error
 
 ### WalletSetupService
-- Require biometric authentication
-- Throw errors for authentication failures
+- Does not enforce biometric/device auth - that's the consuming app's responsibility
+- Throw errors for missing/corrupted wallet data
 - Log all setup operations
 
 ## Testing Error Handling

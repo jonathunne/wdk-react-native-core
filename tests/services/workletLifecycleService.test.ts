@@ -35,11 +35,13 @@ jest.mock('react-native-bare-kit', () => ({
 const mockWorkletStart = jest.fn(() => Promise.resolve({ status: 'success' }))
 
 const mockInitializeWDK = jest.fn(() => Promise.resolve({ status: 'success' }))
+const mockDispose = jest.fn()
 const mockHRPCInstance = {
   workletStart: mockWorkletStart,
   onModuleEvent: jest.fn(),
   ipc: mockWorkletInstance.IPC,
   initializeWDK: mockInitializeWDK,
+  dispose: mockDispose,
 }
 
 jest.mock('@tetherto/pear-wrk-wdk/hrpc', () => {
@@ -623,6 +625,59 @@ describe('WorkletLifecycleService', () => {
       WorkletLifecycleService.reset()
 
       expect(getEpoch()).toBe(before + 3)
+    })
+
+    it('disposes the WDK instance in the worklet when hrpc is available, so the seed it holds gets zeroed', () => {
+      mockSharedStore.getState = jest.fn(() => ({
+        isWorkletStarted: true,
+        isInitialized: true,
+        isLoading: false,
+        worklet: mockWorkletInstance,
+        hrpc: mockHRPCInstance,
+        ipc: mockWorkletInstance.IPC,
+        error: null,
+      }))
+
+      WorkletLifecycleService.reset()
+
+      expect(mockDispose).toHaveBeenCalledWith({})
+    })
+
+    it('does not attempt to dispose when no hrpc instance exists', () => {
+      mockSharedStore.getState = jest.fn(() => ({
+        isWorkletStarted: false,
+        isInitialized: false,
+        isLoading: false,
+        worklet: null,
+        hrpc: null,
+        ipc: null,
+        error: null,
+      }))
+
+      WorkletLifecycleService.reset()
+
+      expect(mockDispose).not.toHaveBeenCalled()
+    })
+
+    it('still clears local state even if the worklet-side dispose call itself throws', () => {
+      mockDispose.mockImplementationOnce(() => {
+        throw new Error('stream already closed')
+      })
+      mockSharedStore.getState = jest.fn(() => ({
+        isWorkletStarted: true,
+        isInitialized: true,
+        isLoading: false,
+        worklet: mockWorkletInstance,
+        hrpc: mockHRPCInstance,
+        ipc: mockWorkletInstance.IPC,
+        error: null,
+      }))
+
+      expect(() => WorkletLifecycleService.reset()).not.toThrow()
+
+      expect(mockSharedStore.setState).toHaveBeenCalledWith(
+        expect.objectContaining({ isInitialized: false, wdkInitResult: null }),
+      )
     })
   })
 })

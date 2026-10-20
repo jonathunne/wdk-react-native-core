@@ -23,8 +23,9 @@
  * Since the data is non-sensitive, we use DETERMINISTIC key derivation from account identifier.
  * This allows the same account to access the same encrypted data across devices.
  * 
- * IMPORTANT: For sensitive data (wallet seeds, encryption keys), use SecureStorage which
- * uses randomly generated keys stored in the device keychain.
+ * IMPORTANT: For sensitive data (wallet seeds, encryption keys), use secureStorage
+ * (src/storage/secureStorage.ts), which uses randomly generated keys stored in the
+ * device keychain.
  */
 
 import * as Crypto from 'expo-crypto'

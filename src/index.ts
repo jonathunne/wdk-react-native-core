@@ -66,3 +66,10 @@ export { useModule } from './hooks/useModule'
 export type { UseModuleProxy } from './hooks/useModule'
 export { ModuleService } from './services/moduleService'
 export type { ModuleEventListener } from './services/moduleService'
+
+// Advanced/direct storage access - most apps should manage wallets through useWalletManager
+// instead. This is the escape hatch for consumers that need to read/write keychain-backed
+// wallet credentials directly (e.g. migrating off @tetherto/wdk-react-native-secure-storage).
+// See docs/legacy-secure-storage-compat.md for DEFAULT_IDENTIFIER's purpose and usage.
+export { createSecureStorage, DEFAULT_IDENTIFIER, SecureStorageError, KeychainReadError, KeychainWriteError, ValidationError, TimeoutError } from './storage/secureStorage'
+export type { SecureStorage } from './storage/secureStorage'

@@ -20,7 +20,6 @@ import { useWdkApp } from '../../src/hooks/useWdkApp';
 import { useWalletOrchestrator } from '../../src/hooks/internal/useWalletOrchestrator';
 import { validateWdkConfigs, validateBalanceRefreshInterval } from '../../src/utils/validation';
 import type { WdkConfigs, BundleConfig } from '../../src/types';
-import { mockSecureStorage } from '../__mocks__/secureStorage';
 
 jest.mock('../../src/hooks/internal/useWalletOrchestrator', () => ({
   useWalletOrchestrator: jest.fn(),
@@ -145,26 +144,6 @@ describe('WdkAppProvider', () => {
       expect(() => validateBalanceRefreshInterval(0)).not.toThrow();
       expect(() => validateBalanceRefreshInterval(-1)).toThrow();
       expect(() => validateBalanceRefreshInterval(NaN)).toThrow();
-    });
-
-    it('should validate secureStorage has required methods', () => {
-      const requiredMethods = ['authenticate', 'hasWallet', 'setEncryptionKey', 'setEncryptedSeed', 'getAllEncrypted'];
-      
-      for (const method of requiredMethods) {
-        expect(typeof mockSecureStorage[method as keyof typeof mockSecureStorage]).toBe('function');
-      }
-    });
-
-    it('should detect missing secureStorage methods', () => {
-      const invalidStorage = {
-        authenticate: jest.fn(),
-        // Missing other methods
-      };
-      
-      const requiredMethods = ['hasWallet', 'setEncryptionKey', 'setEncryptedSeed', 'getAllEncrypted'];
-      for (const method of requiredMethods) {
-        expect(typeof (invalidStorage as any)[method]).not.toBe('function');
-      }
     });
   });
 });

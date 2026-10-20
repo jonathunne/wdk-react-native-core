@@ -14,15 +14,21 @@
 
 /**
  * Tests for WalletSetupService
- * 
+ *
  * Tests wallet creation, loading, and identifier-based multi-wallet support
  */
 
 import { WalletSetupService } from '../../src/services/walletSetupService'
-import { mockSecureStorage } from '../__mocks__/secureStorage'
+import { mockSecureStorage, resetMockSecureStorage } from '../__mocks__/secureStorage'
 import { WorkletLifecycleService } from '../../src/services/workletLifecycleService'
 import { getWorkletStore } from '../../src/store/workletStore'
 import type { WdkConfigs } from '../../src/types'
+
+const TEST_ID = 'user@example.com'
+
+// WalletSetupService now calls createSecureStorage() itself rather than taking an
+// injected instance, so secureStorage.ts is mocked the same way as any other dependency.
+jest.mock('../../src/storage/secureStorage', () => require('../__mocks__/secureStorage'))
 
 // Mock WorkletLifecycleService
 jest.mock('../../src/services/workletLifecycleService', () => ({
@@ -30,16 +36,17 @@ jest.mock('../../src/services/workletLifecycleService', () => ({
     startWorklet: jest.fn(() => Promise.resolve()),
     ensureWorkletStarted: jest.fn(),
     generateEntropyAndEncrypt: jest.fn(() => Promise.resolve({
-      encryptionKey: 'test-encryption-key',
-      encryptedSeedBuffer: 'test-encrypted-seed',
-      encryptedEntropyBuffer: 'test-encrypted-entropy',
+      encryptionKey: Buffer.from('test-encryption-key'),
+      encryptedSeedBuffer: Buffer.from('test-encrypted-seed'),
+      encryptedEntropyBuffer: Buffer.from('test-encrypted-entropy'),
     })),
     getSeedAndEntropyFromMnemonic: jest.fn(() => Promise.resolve({
-      encryptionKey: 'test-encryption-key',
-      encryptedSeedBuffer: 'test-encrypted-seed-from-mnemonic',
-      encryptedEntropyBuffer: 'test-encrypted-entropy-from-mnemonic',
+      encryptionKey: Buffer.from('test-encryption-key'),
+      encryptedSeedBuffer: Buffer.from('test-encrypted-seed-from-mnemonic'),
+      encryptedEntropyBuffer: Buffer.from('test-encrypted-entropy-from-mnemonic'),
     })),
     initializeWDK: jest.fn(() => Promise.resolve()),
+    getMnemonicFromEntropy: jest.fn(() => Promise.resolve({ mnemonic: 'test mnemonic phrase' })),
     reset: jest.fn(),
   },
 }))
@@ -73,12 +80,7 @@ describe('WalletSetupService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    // Set the secureStorage instance for testing
-    WalletSetupService.setSecureStorage(mockSecureStorage, true)
-    // Clear mock storage between tests
-    if (typeof (mockSecureStorage as any)._clearStorage === 'function') {
-      (mockSecureStorage as any)._clearStorage()
-    }
+    resetMockSecureStorage()
     // Reset worklet store mock - default state
     const mockStore = getWorkletStore() as any
     if (mockStore) {
@@ -90,155 +92,119 @@ describe('WalletSetupService', () => {
   })
 
   describe('createNewWallet', () => {
-    it('should create a new wallet without identifier', async () => {
-      const result = await WalletSetupService.createNewWallet(
-      )
+    it('should create a new wallet', async () => {
+      const result = await WalletSetupService.createNewWallet(TEST_ID)
 
       expect(result).toHaveProperty('encryptionKey')
       expect(result).toHaveProperty('encryptedSeed')
       expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
-        'test-encryption-key',
-        undefined,
-        { requireBiometrics: false }
+        Buffer.from('test-encryption-key').toString('base64'),
+        TEST_ID
       )
       expect(mockSecureStorage.setEncryptedSeed).toHaveBeenCalledWith(
-        'test-encrypted-seed',
-        undefined
+        Buffer.from('test-encrypted-seed').toString('base64'),
+        TEST_ID
       )
       expect(mockSecureStorage.setEncryptedEntropy).toHaveBeenCalledWith(
-        'test-encrypted-entropy',
-        undefined
+        Buffer.from('test-encrypted-entropy').toString('base64'),
+        TEST_ID
       )
     })
 
-    it('should create a new wallet with identifier', async () => {
-      const identifier = 'user@example.com'
-      const result = await WalletSetupService.createNewWallet(
-        identifier
-      )
+    it('zeroes the entropy buffer once secureStorage has it, but leaves the returned key/seed intact', async () => {
+      const entropyBuffer = Buffer.from('test-entropy-to-zero')
+      const encryptionKeyBuffer = Buffer.from('test-key-to-keep')
+      const encryptedSeedBuffer = Buffer.from('test-seed-to-keep')
+      ;(WorkletLifecycleService.generateEntropyAndEncrypt as jest.Mock).mockResolvedValueOnce({
+        encryptionKey: encryptionKeyBuffer,
+        encryptedSeedBuffer: encryptedSeedBuffer,
+        encryptedEntropyBuffer: entropyBuffer,
+      })
 
-      expect(result).toHaveProperty('encryptionKey')
-      expect(result).toHaveProperty('encryptedSeed')
-      expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
-        'test-encryption-key',
-        identifier,
-        { requireBiometrics: false }
-      )
-      expect(mockSecureStorage.setEncryptedSeed).toHaveBeenCalledWith(
-        'test-encrypted-seed',
-        identifier
-      )
-      expect(mockSecureStorage.setEncryptedEntropy).toHaveBeenCalledWith(
-        'test-encrypted-entropy',
-        identifier
-      )
+      const result = await WalletSetupService.createNewWallet(TEST_ID)
+
+      expect(entropyBuffer).toEqual(Buffer.alloc(entropyBuffer.length))
+      // Compare against fresh buffers, not the same references, so zeroing
+      // the returned key/seed (a bug this guards against) would be caught.
+      expect(result.encryptionKey).toEqual(Buffer.from('test-key-to-keep'))
+      expect(result.encryptedSeed).toEqual(Buffer.from('test-seed-to-keep'))
     })
   })
 
   describe('loadExistingWallet', () => {
-    it('should load existing wallet without identifier', async () => {
-      // Setup: create a wallet first
-      await mockSecureStorage.setEncryptionKey('test-key', undefined)
-      await mockSecureStorage.setEncryptedSeed('test-seed', undefined)
+    it('should load an existing wallet', async () => {
+      // Setup: simulate a wallet already persisted as base64 (what createNewWallet writes)
+      await mockSecureStorage.setEncryptionKey(Buffer.from('test-key').toString('base64'), TEST_ID)
+      await mockSecureStorage.setEncryptedSeed(Buffer.from('test-seed').toString('base64'), TEST_ID)
 
-      const result = await WalletSetupService.loadExistingWallet()
+      const result = await WalletSetupService.loadExistingWallet(TEST_ID)
 
-      expect(result).toHaveProperty('encryptionKey', 'test-key')
-      expect(result).toHaveProperty('encryptedSeed', 'test-seed')
-      expect(mockSecureStorage.getEncryptedSeed).toHaveBeenCalledWith(undefined)
-      expect(mockSecureStorage.getEncryptionKey).toHaveBeenCalledWith(undefined, { requireBiometrics: false })
-    })
-
-    it('should load existing wallet with identifier', async () => {
-      const identifier = 'user@example.com'
-      // Setup: create a wallet with identifier
-      await mockSecureStorage.setEncryptionKey('test-key', identifier)
-      await mockSecureStorage.setEncryptedSeed('test-seed', identifier)
-
-      const result = await WalletSetupService.loadExistingWallet(identifier)
-
-      expect(result).toHaveProperty('encryptionKey', 'test-key')
-      expect(result).toHaveProperty('encryptedSeed', 'test-seed')
-      expect(mockSecureStorage.getEncryptedSeed).toHaveBeenCalledWith(identifier)
-      expect(mockSecureStorage.getEncryptionKey).toHaveBeenCalledWith(identifier, { requireBiometrics: false })
+      expect(result.encryptionKey).toEqual(Buffer.from('test-key'))
+      expect(result.encryptedSeed).toEqual(Buffer.from('test-seed'))
+      expect(mockSecureStorage.getEncryptedSeed).toHaveBeenCalledWith(TEST_ID)
+      expect(mockSecureStorage.getEncryptionKey).toHaveBeenCalledWith(TEST_ID)
     })
 
     it('should throw error if encryption key not found', async () => {
-      await mockSecureStorage.clearAll()
-      
       await expect(
-        WalletSetupService.loadExistingWallet()
+        WalletSetupService.loadExistingWallet(TEST_ID)
       ).rejects.toThrow('Encryption key not found')
     })
 
     it('should throw error if encrypted seed not found', async () => {
-      await mockSecureStorage.setEncryptionKey('test-key', undefined)
+      await mockSecureStorage.setEncryptionKey('test-key', TEST_ID)
       // Don't set seed
 
       await expect(
-        WalletSetupService.loadExistingWallet()
+        WalletSetupService.loadExistingWallet(TEST_ID)
       ).rejects.toThrow('Encrypted seed not found')
     })
   })
 
   describe('hasWallet', () => {
     it('should return false when no wallet exists', async () => {
-      const result = await WalletSetupService.hasWallet()
+      const result = await WalletSetupService.hasWallet(TEST_ID)
       expect(result).toBe(false)
-      expect(mockSecureStorage.hasWallet).toHaveBeenCalledWith(undefined)
+      expect(mockSecureStorage.hasWallet).toHaveBeenCalledWith(TEST_ID)
     })
 
     it('should return true when wallet exists', async () => {
-      await mockSecureStorage.setEncryptionKey('test-key', undefined)
-      const result = await WalletSetupService.hasWallet()
+      await mockSecureStorage.setEncryptionKey('test-key', TEST_ID)
+      const result = await WalletSetupService.hasWallet(TEST_ID)
       expect(result).toBe(true)
-    })
-
-    it('should check wallet with identifier', async () => {
-      const identifier = 'user@example.com'
-      await mockSecureStorage.setEncryptionKey('test-key', identifier)
-      const result = await WalletSetupService.hasWallet(identifier)
-      expect(result).toBe(true)
-      expect(mockSecureStorage.hasWallet).toHaveBeenCalledWith(identifier)
     })
   })
 
   describe('initializeFromMnemonic', () => {
     const testMnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
-    it('should initialize wallet from mnemonic without identifier', async () => {
-      const result = await WalletSetupService.initializeFromMnemonic(
-        testMnemonic
-      )
+    it('should initialize wallet from mnemonic', async () => {
+      const result = await WalletSetupService.initializeFromMnemonic(testMnemonic, TEST_ID)
 
       expect(result).toHaveProperty('encryptionKey')
       expect(result).toHaveProperty('encryptedSeed')
       expect(result).toHaveProperty('encryptedEntropy')
       expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
-        'test-encryption-key',
-        undefined,
-        { requireBiometrics: false }
+        Buffer.from('test-encryption-key').toString('base64'),
+        TEST_ID
+      )
+      expect(mockSecureStorage.setEncryptedSeed).toHaveBeenCalledWith(
+        Buffer.from('test-encrypted-seed-from-mnemonic').toString('base64'),
+        TEST_ID
       )
       expect(WorkletLifecycleService.initializeWDK).toHaveBeenCalled()
     })
 
-    it('should initialize wallet from mnemonic with identifier', async () => {
-      const identifier = 'user@example.com'
-      const result = await WalletSetupService.initializeFromMnemonic(
-        testMnemonic,
-        identifier
-      )
+    it('resets the worklet if a secure-storage write fails after WDK was already initialized in-worklet', async () => {
+      (mockSecureStorage.setEncryptedSeed as jest.Mock).mockImplementationOnce(() => {
+        return Promise.reject(new Error('keychain write failed'))
+      })
 
-      expect(result).toHaveProperty('encryptionKey')
-      expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
-        'test-encryption-key',
-        identifier,
-        { requireBiometrics: false }
-      )
-      expect(mockSecureStorage.setEncryptedSeed).toHaveBeenCalledWith(
-        'test-encrypted-seed-from-mnemonic',
-        identifier
-      )
+      await expect(
+        WalletSetupService.initializeFromMnemonic(testMnemonic, TEST_ID)
+      ).rejects.toThrow('keychain write failed')
+
+      expect(WorkletLifecycleService.reset).toHaveBeenCalled()
     })
   })
 
@@ -250,9 +216,7 @@ describe('WalletSetupService', () => {
         isInitialized: false,
       }))
 
-      await WalletSetupService.initializeWallet(
-        { createNew: true }
-      )
+      await WalletSetupService.initializeWallet({ createNew: true, walletId: TEST_ID })
 
       expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalled()
       expect(WorkletLifecycleService.initializeWDK).toHaveBeenCalled()
@@ -266,12 +230,10 @@ describe('WalletSetupService', () => {
       }))
 
       // Setup: create a wallet first
-      await mockSecureStorage.setEncryptionKey('test-key', undefined)
-      await mockSecureStorage.setEncryptedSeed('test-seed', undefined)
+      await mockSecureStorage.setEncryptionKey('test-key', TEST_ID)
+      await mockSecureStorage.setEncryptedSeed('test-seed', TEST_ID)
 
-      await WalletSetupService.initializeWallet(
-        { createNew: false }
-      )
+      await WalletSetupService.initializeWallet({ createNew: false, walletId: TEST_ID })
 
       expect(mockSecureStorage.getEncryptedSeed).toHaveBeenCalled()
       expect(mockSecureStorage.getEncryptionKey).toHaveBeenCalled()
@@ -285,15 +247,11 @@ describe('WalletSetupService', () => {
         isInitialized: false,
       }))
 
-      const identifier = 'user@example.com'
-      await WalletSetupService.initializeWallet(
-        { createNew: true, walletId: identifier }
-      )
+      await WalletSetupService.initializeWallet({ createNew: true, walletId: TEST_ID })
 
       expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
         expect.any(String),
-        identifier,
-        { requireBiometrics: false }
+        TEST_ID
       )
     })
 
@@ -303,17 +261,14 @@ describe('WalletSetupService', () => {
         isWorkletStarted: true,
         isInitialized: false,
       }))
-      
-      const identifier = 'user@example.com'
-      await mockSecureStorage.setEncryptionKey('test-key', identifier)
-      await mockSecureStorage.setEncryptedSeed('test-seed', identifier)
 
-      await WalletSetupService.initializeWallet(
-        { createNew: false, walletId: identifier }
-      )
+      await mockSecureStorage.setEncryptionKey('test-key', TEST_ID)
+      await mockSecureStorage.setEncryptedSeed('test-seed', TEST_ID)
 
-      expect(mockSecureStorage.getEncryptedSeed).toHaveBeenCalledWith(identifier)
-      expect(mockSecureStorage.getEncryptionKey).toHaveBeenCalledWith(identifier, { requireBiometrics: false })
+      await WalletSetupService.initializeWallet({ createNew: false, walletId: TEST_ID })
+
+      expect(mockSecureStorage.getEncryptedSeed).toHaveBeenCalledWith(TEST_ID)
+      expect(mockSecureStorage.getEncryptionKey).toHaveBeenCalledWith(TEST_ID)
     })
   })
 
@@ -325,9 +280,9 @@ describe('WalletSetupService', () => {
       generateMock.mockImplementation(() => {
         callCount++
         return Promise.resolve({
-          encryptionKey: `encryption-key-${callCount}`,
-          encryptedSeedBuffer: `encrypted-seed-${callCount}`,
-          encryptedEntropyBuffer: `encrypted-entropy-${callCount}`,
+          encryptionKey: Buffer.from(`encryption-key-${callCount}`),
+          encryptedSeedBuffer: Buffer.from(`encrypted-seed-${callCount}`),
+          encryptedEntropyBuffer: Buffer.from(`encrypted-entropy-${callCount}`),
         })
       })
 
@@ -335,39 +290,33 @@ describe('WalletSetupService', () => {
       const identifier2 = 'user2@example.com'
 
       // Create wallet for user1
-      const result1 = await WalletSetupService.createNewWallet(
-        identifier1
-      )
+      const result1 = await WalletSetupService.createNewWallet(identifier1)
 
       // Create wallet for user2
-      const result2 = await WalletSetupService.createNewWallet(
-        identifier2
-      )
+      const result2 = await WalletSetupService.createNewWallet(identifier2)
 
       // Verify different seeds were generated
-      expect(result1.encryptedSeed).toBe('encrypted-seed-1')
-      expect(result2.encryptedSeed).toBe('encrypted-seed-2')
-      expect(result1.encryptedSeed).not.toBe(result2.encryptedSeed)
+      expect(result1.encryptedSeed).toEqual(Buffer.from('encrypted-seed-1'))
+      expect(result2.encryptedSeed).toEqual(Buffer.from('encrypted-seed-2'))
+      expect(result1.encryptedSeed).not.toEqual(result2.encryptedSeed)
 
-      // Verify wallets are stored separately
+      // Verify wallets are stored separately, as base64 (secureStorage is string-only)
       expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
-        'encryption-key-1',
-        identifier1,
-        { requireBiometrics: false }
+        Buffer.from('encryption-key-1').toString('base64'),
+        identifier1
       )
       expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
-        'encryption-key-2',
-        identifier2,
-        { requireBiometrics: false }
+        Buffer.from('encryption-key-2').toString('base64'),
+        identifier2
       )
 
       // Verify we can load each wallet independently
       const loaded1 = await WalletSetupService.loadExistingWallet(identifier1)
       const loaded2 = await WalletSetupService.loadExistingWallet(identifier2)
 
-      expect(loaded1.encryptedSeed).toBe('encrypted-seed-1')
-      expect(loaded2.encryptedSeed).toBe('encrypted-seed-2')
-      expect(loaded1.encryptedSeed).not.toBe(loaded2.encryptedSeed)
+      expect(loaded1.encryptedSeed).toEqual(Buffer.from('encrypted-seed-1'))
+      expect(loaded2.encryptedSeed).toEqual(Buffer.from('encrypted-seed-2'))
+      expect(loaded1.encryptedSeed).not.toEqual(loaded2.encryptedSeed)
     })
 
     it('should verify that creating two wallets with different identifiers gives different seeds', async () => {
@@ -378,26 +327,21 @@ describe('WalletSetupService', () => {
         seedCounter++
         // Simulate different entropy generation (in real scenario, this would be random)
         return Promise.resolve({
-          encryptionKey: `key-${seedCounter}-${Date.now()}`,
-          encryptedSeedBuffer: `seed-${seedCounter}-${Math.random()}`,
-          encryptedEntropyBuffer: `entropy-${seedCounter}-${Math.random()}`,
+          encryptionKey: Buffer.from(`key-${seedCounter}-${Date.now()}`),
+          encryptedSeedBuffer: Buffer.from(`seed-${seedCounter}-${Math.random()}`),
+          encryptedEntropyBuffer: Buffer.from(`entropy-${seedCounter}-${Math.random()}`),
         })
       })
 
       const identifier1 = 'alice@example.com'
       const identifier2 = 'bob@example.com'
 
-      const wallet1 = await WalletSetupService.createNewWallet(
-        identifier1
-      )
-
-      const wallet2 = await WalletSetupService.createNewWallet(
-        identifier2
-      )
+      const wallet1 = await WalletSetupService.createNewWallet(identifier1)
+      const wallet2 = await WalletSetupService.createNewWallet(identifier2)
 
       // Critical assertion: seeds must be different
-      expect(wallet1.encryptedSeed).not.toBe(wallet2.encryptedSeed)
-      expect(wallet1.encryptionKey).not.toBe(wallet2.encryptionKey)
+      expect(wallet1.encryptedSeed).not.toEqual(wallet2.encryptedSeed)
+      expect(wallet1.encryptionKey).not.toEqual(wallet2.encryptionKey)
 
       // Verify each wallet is stored with its own identifier
       const hasWallet1 = await WalletSetupService.hasWallet(identifier1)
@@ -410,9 +354,9 @@ describe('WalletSetupService', () => {
       const loadedWallet1 = await WalletSetupService.loadExistingWallet(identifier1)
       const loadedWallet2 = await WalletSetupService.loadExistingWallet(identifier2)
 
-      expect(loadedWallet1.encryptedSeed).toBe(wallet1.encryptedSeed)
-      expect(loadedWallet2.encryptedSeed).toBe(wallet2.encryptedSeed)
-      expect(loadedWallet1.encryptedSeed).not.toBe(loadedWallet2.encryptedSeed)
+      expect(loadedWallet1.encryptedSeed).toEqual(wallet1.encryptedSeed)
+      expect(loadedWallet2.encryptedSeed).toEqual(wallet2.encryptedSeed)
+      expect(loadedWallet1.encryptedSeed).not.toEqual(loadedWallet2.encryptedSeed)
     })
 
     it('should isolate wallets by identifier', async () => {
@@ -420,22 +364,100 @@ describe('WalletSetupService', () => {
       const identifier2 = 'user2@example.com'
 
       // Create wallet for identifier1
-      await WalletSetupService.createNewWallet(
-        identifier1
-      )
+      await WalletSetupService.createNewWallet(identifier1)
 
       // Create wallet for identifier2
-      await WalletSetupService.createNewWallet(
-        identifier2
-      )
+      await WalletSetupService.createNewWallet(identifier2)
 
       // Verify each identifier has its own wallet
       expect(await WalletSetupService.hasWallet(identifier1)).toBe(true)
       expect(await WalletSetupService.hasWallet(identifier2)).toBe(true)
 
-      // Verify default identifier (no identifier) doesn't have a wallet
-      expect(await WalletSetupService.hasWallet(undefined)).toBe(false)
+      // A third, never-created identifier has no wallet
+      expect(await WalletSetupService.hasWallet('nobody@example.com')).toBe(false)
+    })
+  })
+
+  describe('getMnemonic', () => {
+    it('returns null when no encrypted entropy or key is stored', async () => {
+      const result = await WalletSetupService.getMnemonic(TEST_ID)
+      expect(result).toBeNull()
+    })
+
+    it('decodes the stored base64 values to Buffer before calling getMnemonicFromEntropy', async () => {
+      await mockSecureStorage.setEncryptedEntropy(Buffer.from('test-entropy').toString('base64'), TEST_ID)
+      await mockSecureStorage.setEncryptionKey(Buffer.from('test-key').toString('base64'), TEST_ID)
+
+      // Capture a copy at call time - the real buffers get zeroed in-place
+      // right after this call resolves, so asserting on the mock's retained
+      // reference afterward would just see zeros (verified below instead).
+      let capturedEntropy: Buffer | undefined
+      let capturedKey: Buffer | undefined
+      ;(WorkletLifecycleService.getMnemonicFromEntropy as jest.Mock).mockImplementationOnce(
+        (entropy: Buffer, key: Buffer) => {
+          capturedEntropy = Buffer.from(entropy)
+          capturedKey = Buffer.from(key)
+          return Promise.resolve({ mnemonic: 'test mnemonic phrase' })
+        },
+      )
+
+      const result = await WalletSetupService.getMnemonic(TEST_ID)
+
+      expect(capturedEntropy).toEqual(Buffer.from('test-entropy'))
+      expect(capturedKey).toEqual(Buffer.from('test-key'))
+      expect(result).toBe('test mnemonic phrase')
+
+      // The buffers getMnemonic allocated for this call are zeroed once it resolves
+      const [passedEntropy, passedKey] = (WorkletLifecycleService.getMnemonicFromEntropy as jest.Mock).mock.calls[0]
+      expect(passedEntropy).toEqual(Buffer.alloc(passedEntropy.length))
+      expect(passedKey).toEqual(Buffer.alloc(passedKey.length))
+    })
+  })
+
+  describe('without a global Buffer (React Native has no such global)', () => {
+    let originalBuffer: typeof global.Buffer | undefined
+
+    afterEach(() => {
+      global.Buffer = originalBuffer as typeof global.Buffer
+    })
+
+    it('createNewWallet still works, since Buffer is imported explicitly rather than relied on as a global', async () => {
+      // Pre-build fixtures and expectations with the real global still present,
+      // then delete it - only WalletSetupService's own explicitly-imported
+      // Buffer should be exercised from this point on.
+      const fixture = {
+        encryptionKey: Buffer.from('test-encryption-key'),
+        encryptedSeedBuffer: Buffer.from('test-encrypted-seed'),
+        encryptedEntropyBuffer: Buffer.from('test-encrypted-entropy'),
+      }
+      const expectedKeyBase64 = fixture.encryptionKey.toString('base64')
+      ;(WorkletLifecycleService.generateEntropyAndEncrypt as jest.Mock).mockResolvedValueOnce(fixture)
+
+      originalBuffer = global.Buffer
+      delete (global as any).Buffer
+
+      const result = await WalletSetupService.createNewWallet(TEST_ID)
+
+      expect(result).toHaveProperty('encryptionKey')
+      expect(mockSecureStorage.setEncryptionKey).toHaveBeenCalledWith(
+        expectedKeyBase64,
+        TEST_ID
+      )
+    })
+
+    it('loadExistingWallet still works, since Buffer is imported explicitly rather than relied on as a global', async () => {
+      const keyBuffer = Buffer.from('test-key')
+      const seedBuffer = Buffer.from('test-seed')
+      await mockSecureStorage.setEncryptionKey(keyBuffer.toString('base64'), TEST_ID)
+      await mockSecureStorage.setEncryptedSeed(seedBuffer.toString('base64'), TEST_ID)
+
+      originalBuffer = global.Buffer
+      delete (global as any).Buffer
+
+      const result = await WalletSetupService.loadExistingWallet(TEST_ID)
+
+      expect(result.encryptionKey).toEqual(keyBuffer)
+      expect(result.encryptedSeed).toEqual(seedBuffer)
     })
   })
 })
-

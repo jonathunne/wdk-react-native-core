@@ -80,17 +80,7 @@ export class AccountService {
 
       try {
         parsed = JSON.parse(validatedResponse.result)
-
-        if (parsed === null || parsed === undefined) {
-          throw new Error('Parsed result is null or undefined')
-        }
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes('Parsed result is null')
-        ) {
-          throw error
-        }
         throw new Error(
           `Failed to parse result from ${methodName}: ${error instanceof Error ? error.message : String(error)}`,
         )
@@ -160,13 +150,7 @@ export class AccountService {
       let parsed
       try {
         parsed = JSON.parse(validatedResponse.result)
-        if (parsed === null || parsed === undefined) {
-          throw new Error('Parsed result is null or undefined')
-        }
       } catch (error) {
-        if (error instanceof Error && error.message.includes('Parsed result is null')) {
-          throw error
-        }
         throw new Error(
           `Failed to parse result from ${methodName}: ${error instanceof Error ? error.message : String(error)}`,
         )

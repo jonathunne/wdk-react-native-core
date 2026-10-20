@@ -12,95 +12,74 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { DEFAULT_WALLET_IDENTIFIER } from '../../src/utils/constants';
+import type { SecureStorage } from '../../src/storage/secureStorage'
 
 /**
  * Mock SecureStorage for testing
- * 
- * Supports identifier parameter for multi-wallet testing
+ *
+ * Backed by a plain object keyed by identifier - real per-identifier isolation for
+ * multi-wallet tests, without touching the actual keychain.
  */
 
-// Internal storage to simulate per-identifier wallet storage
 const storage: Record<string, {
   encryptionKey: string | null
   encryptedSeed: string | null
   encryptedEntropy: string | null
 }> = {}
 
-const getStorageKey = (identifier?: string): string => {
-  return identifier || DEFAULT_WALLET_IDENTIFIER
-}
-
-export const mockSecureStorage = {
-  authenticate: jest.fn(() => Promise.resolve(true)),
-  hasWallet: jest.fn((identifier?: string) => {
-    const key = getStorageKey(identifier)
-    const wallet = storage[key]
+export const mockSecureStorage: jest.Mocked<SecureStorage> = {
+  hasWallet: jest.fn((identifier: string) => {
+    const wallet = storage[identifier]
     return Promise.resolve(wallet !== undefined && wallet.encryptionKey !== null)
   }),
-  setEncryptionKey: jest.fn((key: string, identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    if (!storage[storageKey]) {
-      storage[storageKey] = { encryptionKey: null, encryptedSeed: null, encryptedEntropy: null }
+  setEncryptionKey: jest.fn((key: string, identifier: string) => {
+    if (!storage[identifier]) {
+      storage[identifier] = { encryptionKey: null, encryptedSeed: null, encryptedEntropy: null }
     }
-    storage[storageKey].encryptionKey = key
+    storage[identifier].encryptionKey = key
     return Promise.resolve()
   }),
-  getEncryptionKey: jest.fn((identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    return Promise.resolve(storage[storageKey]?.encryptionKey || null)
+  getEncryptionKey: jest.fn((identifier: string) => {
+    return Promise.resolve(storage[identifier]?.encryptionKey || null)
   }),
-  setEncryptedSeed: jest.fn((seed: string, identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    if (!storage[storageKey]) {
-      storage[storageKey] = { encryptionKey: null, encryptedSeed: null, encryptedEntropy: null }
+  setEncryptedSeed: jest.fn((seed: string, identifier: string) => {
+    if (!storage[identifier]) {
+      storage[identifier] = { encryptionKey: null, encryptedSeed: null, encryptedEntropy: null }
     }
-    storage[storageKey].encryptedSeed = seed
+    storage[identifier].encryptedSeed = seed
     return Promise.resolve()
   }),
-  getEncryptedSeed: jest.fn((identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    return Promise.resolve(storage[storageKey]?.encryptedSeed || null)
+  getEncryptedSeed: jest.fn((identifier: string) => {
+    return Promise.resolve(storage[identifier]?.encryptedSeed || null)
   }),
-  setEncryptedEntropy: jest.fn((entropy: string, identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    if (!storage[storageKey]) {
-      storage[storageKey] = { encryptionKey: null, encryptedSeed: null, encryptedEntropy: null }
+  setEncryptedEntropy: jest.fn((entropy: string, identifier: string) => {
+    if (!storage[identifier]) {
+      storage[identifier] = { encryptionKey: null, encryptedSeed: null, encryptedEntropy: null }
     }
-    storage[storageKey].encryptedEntropy = entropy
+    storage[identifier].encryptedEntropy = entropy
     return Promise.resolve()
   }),
-  getEncryptedEntropy: jest.fn((identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    return Promise.resolve(storage[storageKey]?.encryptedEntropy || null)
+  getEncryptedEntropy: jest.fn((identifier: string) => {
+    return Promise.resolve(storage[identifier]?.encryptedEntropy || null)
   }),
-  getAllEncrypted: jest.fn((identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    const wallet = storage[storageKey]
+  getAllEncrypted: jest.fn((identifier: string) => {
+    const wallet = storage[identifier]
     return Promise.resolve({
       encryptedSeed: wallet?.encryptedSeed || null,
       encryptedEntropy: wallet?.encryptedEntropy || null,
       encryptionKey: wallet?.encryptionKey || null,
     })
   }),
-  clearAll: jest.fn(() => {
-    Object.keys(storage).forEach(key => delete storage[key])
-    return Promise.resolve()
-  }),
-  isBiometricAvailable: jest.fn(() => Promise.resolve(true)),
-  deleteWallet: jest.fn((identifier?: string) => {
-    const storageKey = getStorageKey(identifier)
-    delete storage[storageKey]
+  deleteWallet: jest.fn((identifier: string) => {
+    delete storage[identifier]
     return Promise.resolve()
   }),
   cleanup: jest.fn(),
-  // Helper method to clear storage between tests
-  _clearStorage: () => {
-    Object.keys(storage).forEach(key => delete storage[key])
-  },
-  isDeviceSecurityEnabled: jest.fn(() => {
-    return Promise.resolve(true)
-  })
+}
+
+/** Test-only helper to clear mock storage between tests - not part of SecureStorage. */
+export function resetMockSecureStorage(): void {
+  Object.keys(storage).forEach((key) => delete storage[key])
 }
 
 export const createSecureStorage = () => mockSecureStorage

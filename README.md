@@ -1,8 +1,10 @@
 # @tetherto/wdk-react-native-core
 
-Core functionality for React Native wallets, providing wallet management, balance fetching, and more.
+Core functionality for React Native wallets built with WDK (Wallet Development Kit) by Tether, providing wallet management, balance fetching, and more.
 
 This library uses a unique **worklet bundle** to run intensive cryptographic operations on a separate thread, ensuring your app's UI remains fast and responsive.
+
+See the [React Native Core documentation](https://docs.wdk.tether.io/tools/react-native-core/).
 
 ## Features
 
@@ -30,7 +32,11 @@ This library uses a unique **worklet bundle** to run intensive cryptographic ope
 ## Installation
 
 ### 1. Install the Core Library
+
+Install the `expo-crypto` version compatible with your app's Expo SDK, then install the core library:
+
 ```bash
+npx expo install expo-crypto
 npm install @tetherto/wdk-react-native-core
 ```
 
@@ -225,6 +231,15 @@ See [Architecture](docs/architecture.md) for details on the internal design.
 ## Security
 
 See [Security](docs/security.md) for details on security features and best practices.
+
+## Legacy Secure Storage Compatibility
+
+Affects versions after `v1.0.0-beta.20` (the last release before secure storage was
+inlined into this package) - `v1.0.0-beta.20` and earlier never had this concern.
+If `DEFAULT_IDENTIFIER` isn't exported from your installed version, this doesn't apply
+to you yet.
+
+See [Legacy Secure Storage Compatibility](docs/legacy-secure-storage-compat.md) if you're migrating off `@tetherto/wdk-react-native-secure-storage` and have existing users with wallets stored without a per-user identifier.
 
 ## Troubleshooting
 

@@ -11,8 +11,8 @@
 
 **Common Errors**:
 - "WDK not initialized" → Worklet failed to start, check network configs
-- "Biometric authentication required" → User cancelled or device doesn't support biometrics
 - "Encryption key not found" → Secure storage issue, may need to recreate wallet
+- An auth error before `unlock`/`createWallet`/`restoreWallet` is called → that's your app's own biometric/passcode gate, not this library (see `docs/security.md`)
 
 ### Balance Fetching Issues
 
